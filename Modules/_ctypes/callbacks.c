@@ -413,7 +413,7 @@ CThunkObject *AllocFunctionCallback(PyObject *callable,
 		PyObject *cnv = PySequence_GetItem(converters, i);
 		if (cnv == NULL)
 			goto error;
-		p->atypes[i] = GetType(cnv);
+		p->atypes[i] = GetType(cnv,flags);
 		Py_DECREF(cnv);
 	}
 	p->atypes[i] = NULL;
@@ -436,12 +436,15 @@ CThunkObject *AllocFunctionCallback(PyObject *callable,
 
 	cc = FFI_DEFAULT_ABI;
 #if defined(MS_WIN32) && !defined(_WIN32_WCE) && !defined(MS_WIN64)
-	if ((flags & FUNCFLAG_CDECL) == 0)
+	if ((flags & FUNCFLAG_CDECL) == 0) {
 		cc = FFI_STDCALL;
+    if (flags & FUNCFLAG_THISCALL)
+      cc = FFI_THISCALL;
+  }
 #endif
 	result = ffi_prep_cif(&p->cif, cc,
 			      Py_SAFE_DOWNCAST(nArgs, Py_ssize_t, int),
-			      GetType(restype),
+			      GetType(restype,flags),
 			      &p->atypes[0]);
 	if (result != FFI_OK) {
 		PyErr_Format(PyExc_RuntimeError,

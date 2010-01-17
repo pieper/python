@@ -111,6 +111,7 @@ def CFUNCTYPE(restype, *argtypes, **kw):
 if _os.name in ("nt", "ce"):
     from _ctypes import LoadLibrary as _dlopen
     from _ctypes import FUNCFLAG_STDCALL as _FUNCFLAG_STDCALL
+    from _ctypes import FUNCFLAG_THISCALL as _FUNCFLAG_THISCALL
     if _os.name == "ce":
         # 'ce' doesn't have the stdcall calling convention
         _FUNCFLAG_STDCALL = _FUNCFLAG_CDECL
@@ -387,6 +388,18 @@ if _os.name in ("nt", "ce"):
         Windows stdcall calling convention.
         """
         _func_flags_ = _FUNCFLAG_STDCALL
+
+    _cpp_methodtype_cache = {}
+    def CPPMETHODTYPE(restype, *argtypes):
+        try:
+            return _cpp_methodtype_cache[(restype, argtypes)]
+        except KeyError:
+            class CppMethodType(_CFuncPtr):
+                _argtypes_ = argtypes
+                _restype_ = restype
+                _flags_ = _FUNCFLAG_THISCALL
+            _cpp_methodtype_cache[(restype, argtypes)] = CppMethodType
+            return CppMethodType
 
     # XXX Hm, what about HRESULT as normal parameter?
     # Mustn't it derive from c_long then?

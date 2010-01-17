@@ -151,6 +151,13 @@ sc_epilogue:
 		ret
 	}
 }
+ 
+/*
+  This function is used for both STDCALL and THISCALL calling conventions.
+  The difference is that STDCALL passes all arguments on the stack, while
+  THISCALL passes the first argument, which is always the THIS pointer, in
+  register ecx.
+ */
 
 __declspec(naked) int
 ffi_call_STDCALL(void (* prepfunc)(char *, extended_cif *), /* 8 */
@@ -173,19 +180,40 @@ ffi_call_STDCALL(void (* prepfunc)(char *, extended_cif *), /* 8 */
 		mov ecx, [ebp+16]
 		sub esp, ecx
 		
-		mov eax, esp
 
 // Place all of the ffi_prep_args in position
+		mov eax, esp // our stack
 		push [ebp + 12] // ecif
 		push eax
 		call [ebp + 8] // prepfunc
 
-// Return stack to previous state and call the function
+// Return stack to previous state
 		add esp, 8
+
+// prepfunc returns XXX
+
+// Load cif.abi into edx: For FFI_THISCALL (and later FFI_FASTCALL)
+// arguments must be moved from the stack into registers.
+//		mov edx, [ebp + 12] // edx: *ecif
+//		mov edx, [edx] // edx: *ecif->cif
+//		mov edx, [edx] // edx: *ecif->cif.abi
+//		cmp edx, FFI_THISCALL
+//		jne no_thiscall
+//		pop ecx // this pointer is passed in ecx
+//no_thiscall:
+
+// for THISCALL functions, ffi_prep_args returns a pointer to the arguments
+		cmp eax, 0
+		je no_this_pointer
+		mov ecx, [eax]
+		mov ecx, [ecx]
+no_this_pointer:
+
+
 // FIXME: Align the stack to a 128-bit boundary to avoid
 // potential performance hits.
 		call [ebp + 28]
-// stdcall functions pop arguments off the stack themselves
+// stdcall/thiscall functions pop arguments off the stack themselves
 
 // XXX IS ESP NOW THE SAME AS BEFORE?
 		sub esi, esp

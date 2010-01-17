@@ -37,7 +37,11 @@
 extern void Py_FatalError(char *msg);
 
 /*@-exportheader@*/
-void ffi_prep_args(char *stack, extended_cif *ecif)
+/*
+ * For FFI_THISCALL, the first argument is NOT put on the stack,
+ * it is returned instead.
+ */
+void *ffi_prep_args(char *stack, extended_cif *ecif)
 /*@=exportheader@*/
 {
   register unsigned int i;
@@ -54,7 +58,14 @@ void ffi_prep_args(char *stack, extended_cif *ecif)
 
   p_argv = ecif->avalue;
 
-  for (i = ecif->cif->nargs, p_arg = ecif->cif->arg_types;
+  //for (i = ecif->cif->nargs, p_arg = ecif->cif->arg_types;
+  i = ecif->cif->nargs;
+  p_arg = ecif->cif->arg_types;
+  if (ecif->cif->abi == FFI_THISCALL) {
+    /* First arg will be passed in register, don't put onto the stack */
+    i--; p_arg++; p_argv++;
+  }
+  for (;
        i != 0;
        i--, p_arg++)
     {
@@ -114,7 +125,10 @@ void ffi_prep_args(char *stack, extended_cif *ecif)
     {
       Py_FatalError("FFI BUG: not enough stack space for arguments");
     }
-  return;
+  if (ecif->cif->abi == FFI_THISCALL)
+    return ecif->avalue;
+  else
+    return NULL;
 }
 
 /* Perform machine dependent cif processing */
@@ -151,7 +165,7 @@ ffi_status ffi_prep_cif_machdep(ffi_cif *cif)
 /*@-declundef@*/
 /*@-exportheader@*/
 extern int
-ffi_call_SYSV(void (*)(char *, extended_cif *), 
+ffi_call_SYSV(void *(*)(char *, extended_cif *), 
 	      /*@out@*/ extended_cif *, 
 	      unsigned, unsigned, 
 	      /*@out@*/ unsigned *, 
@@ -162,7 +176,7 @@ ffi_call_SYSV(void (*)(char *, extended_cif *),
 /*@-declundef@*/
 /*@-exportheader@*/
 extern int
-ffi_call_STDCALL(void (*)(char *, extended_cif *),
+ffi_call_STDCALL(void *(*)(char *, extended_cif *),
 		 /*@out@*/ extended_cif *,
 		 unsigned, unsigned,
 		 /*@out@*/ unsigned *,
@@ -173,7 +187,7 @@ ffi_call_STDCALL(void (*)(char *, extended_cif *),
 
 #ifdef _WIN64
 extern int
-ffi_call_AMD64(void (*)(char *, extended_cif *),
+ffi_call_AMD64(void *(*)(char *, extended_cif *),
 		 /*@out@*/ extended_cif *,
 		 unsigned, unsigned,
 		 /*@out@*/ unsigned *,
@@ -215,6 +229,7 @@ ffi_call(/*@dependent@*/ ffi_cif *cif,
       /*@=usedef@*/
       break;
 
+    case FFI_THISCALL:
     case FFI_STDCALL:
       /*@-usedef@*/
       return ffi_call_STDCALL(ffi_prep_args, &ecif, cif->bytes,
@@ -411,6 +426,8 @@ ffi_prep_closure (ffi_closure* closure,
 #if !defined(_WIN64)
   else if (cif->abi == FFI_STDCALL)
     bytes = cif->bytes;
+  else if (cif->abi = FFI_THISCALL)
+    bytes = cif->bytes;
 #endif
   else
     return FFI_BAD_ABI;
@@ -453,7 +470,16 @@ ffi_prep_closure (ffi_closure* closure,
   BYTES("\x41\xFF\xE2");
 
 #else
+  if (cif->abi == FFI_THISCALL) {
+    /* pop edx */ /* save return address */
+    BYTES("\x5a");
+    /* push ecx */ /* put first parameter on stack */
+    BYTES("\x51");
+    /* push edx */ /* put return address back onto stack */
+    BYTES("\x52");
+  }
 
+  /* Parameters for ffi_closure_SYSV are passed in registers (fastcall) */
   /* mov ecx, closure */
   BYTES("\xb9"); POINTER(closure);
 

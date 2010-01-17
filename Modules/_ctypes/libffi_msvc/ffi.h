@@ -155,7 +155,8 @@ extern ffi_type ffi_type_pointer;
 typedef enum {
   FFI_OK = 0,
   FFI_BAD_TYPEDEF,
-  FFI_BAD_ABI 
+  FFI_BAD_ABI,
+  FFI_BAD_THISCALL
 } ffi_status;
 
 typedef unsigned FFI_TYPE;

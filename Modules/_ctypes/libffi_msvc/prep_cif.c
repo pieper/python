@@ -96,6 +96,9 @@ ffi_status ffi_prep_cif(/*@out@*/ /*@partial@*/ ffi_cif *cif,
   FFI_ASSERT(cif != NULL);
   FFI_ASSERT((abi > FFI_FIRST_ABI) && (abi <= FFI_DEFAULT_ABI));
 
+  if (abi == FFI_THISCALL && atypes[0]->type != FFI_TYPE_POINTER)
+    return FFI_BAD_THISCALL;
+
   cif->abi = abi;
   cif->arg_types = atypes;
   cif->nargs = nargs;
@@ -167,6 +170,9 @@ ffi_status ffi_prep_cif(/*@out@*/ /*@partial@*/ ffi_cif *cif,
 	}
 #endif
     }
+
+  if (cif->abi == FFI_THISCALL)
+    bytes -= 4;
 
   cif->bytes = bytes;
 

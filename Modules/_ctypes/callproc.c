@@ -709,7 +709,7 @@ static int ConvParam(PyObject *obj, Py_ssize_t index, struct argument *pa)
 }
 
 
-ffi_type *GetType(PyObject *obj)
+ffi_type *GetType(PyObject *obj, int flags)
 {
 	StgDictObject *dict;
 	if (obj == NULL)
@@ -721,7 +721,7 @@ ffi_type *GetType(PyObject *obj)
 	/* This little trick works correctly with MSVC.
 	   It returns small structures in registers
 	*/
-	if (dict->ffi_type_pointer.type == FFI_TYPE_STRUCT) {
+	if (((flags & FUNCFLAG_THISCALL) == 0) && dict->ffi_type_pointer.type == FFI_TYPE_STRUCT) {
 		if (dict->ffi_type_pointer.size <= 4)
 			return &ffi_type_sint32;
 		else if (dict->ffi_type_pointer.size <= 8)
@@ -775,8 +775,12 @@ static int _call_function_pointer(int flags,
 	
 	cc = FFI_DEFAULT_ABI;
 #if defined(MS_WIN32) && !defined(MS_WIN64) && !defined(_WIN32_WCE)
-	if ((flags & FUNCFLAG_CDECL) == 0)
+	if ((flags & FUNCFLAG_CDECL) == 0) {
 		cc = FFI_STDCALL;
+    if ((flags & FUNCFLAG_THISCALL) == FUNCFLAG_THISCALL) {
+      cc = FFI_THISCALL;
+    }
+  }
 #endif
 	if (FFI_OK != ffi_prep_cif(&cif,
 				   cc,
@@ -1139,7 +1143,7 @@ PyObject *_CallProc(PPROC pProc,
 		}
 	}
 
-	rtype = GetType(restype);
+	rtype = GetType(restype, flags);
 	resbuf = alloca(max(rtype->size, sizeof(ffi_arg)));
 
 	avalues = (void **)alloca(sizeof(void *) * argcount);

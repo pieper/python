@@ -322,6 +322,7 @@ PyObject *_CallProc(PPROC pProc,
 #define FUNCFLAG_PYTHONAPI 0x4
 #define FUNCFLAG_USE_ERRNO 0x8
 #define FUNCFLAG_USE_LASTERROR 0x10
+#define FUNCFLAG_THISCALL 0x20
 
 #define TYPEFLAG_ISPOINTER 0x100
 #define TYPEFLAG_HASPOINTER 0x200
@@ -372,7 +373,7 @@ struct basespec {
 
 extern char basespec_string[];
 
-extern ffi_type *GetType(PyObject *obj);
+extern ffi_type *GetType(PyObject *obj, int flags);
 
 /* exception classes */
 extern PyObject *PyExc_ArgError;
